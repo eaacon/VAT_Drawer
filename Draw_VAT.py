@@ -100,7 +100,7 @@ class VAT_OT_draw(bpy.types.Operator):
             obj = bpy.context.active_object.evaluated_get(deps)
             scale = self.calc_ratio([obj])
 
-        context.scene.vat.progress = .2
+        context.scene.vat.progress = .15
 
         #image to show after operation (position VAT usually)
         pImg = None
@@ -123,13 +123,13 @@ class VAT_OT_draw(bpy.types.Operator):
             print(self.cuts)
             vData = self.get_anim_vertex_data(self.cuts, vatObjs, scale)
 
-            pImg = self.draw_vat_image(vData[0], "_position" + meta, [int(self.vertices / self.cuts), int(self.frameCount * self.cuts)])
-            self.draw_vat_image(vData[1], "_normals"+ meta, [int(self.vertices / self.cuts), int(self.frameCount * self.cuts)])
+            self.draw_vat_image(vData[0], "_position" + meta, [int(self.vertices / self.cuts), int(self.frameCount * self.cuts)])
+            pImg = self.draw_vat_image(vData[1], "_normals"+ meta, [int(self.vertices / self.cuts), int(self.frameCount * self.cuts)])
         else:
             vData = self.get_anim_vertex_data(1, vatObjs, scale)
 
             pImg = self.draw_vat_image(vData[0], "_position"+ meta, [self.vertices, self.frameCount])
-            context.scene.vat.progress = .65
+            context.scene.vat.progress = .7
             bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
             self.draw_vat_image(vData[1], "_normals"+ meta, [self.vertices, self.frameCount])
             context.scene.vat.progress = .85
@@ -188,6 +188,8 @@ class VAT_OT_draw(bpy.types.Operator):
         #create new image
         image = bpy.data.images.new(bpy.path.basename(fPath), width = size[0], height = size[1], float_buffer=True, is_data=True)
         image.colorspace_settings
+        print(len(image.pixels))
+        print(len(pixels))
         image.pixels = pixels
 
         #print(pixels)
@@ -291,49 +293,82 @@ class VAT_OT_draw(bpy.types.Operator):
                 x = 0
                 y = (f + 1) * height
 
-    def get_anim_vertex_data(self, cuts, objs, ratio):
+    def get_anim_vertex_data(self, splits, objs, ratio):
         posData = list()
         normData = list()
 
-        #for f in range(splits):
-        for frame in range(self.frameCount):
-            bpy.data.scenes['Scene'].frame_set(frame + bpy.context.scene.frame_start)
-            for obj in objs:
-                #dupe = obj.copy()   
-                #dupe.data = obj.data.copy()
+        sLength = self.vertices/splits
 
-                dg = bpy.context.view_layer.depsgraph
-                evalObj = obj.evaluated_get(dg)
+        #get obj vertex info
+        objInfo = []
+        for i, obj in enumerate(objs):
+            dg = bpy.context.view_layer.depsgraph
+            evalObj = obj.evaluated_get(dg)
+            objInfo.append([i,len(evalObj.data.vertices)])
 
-                mb = evalObj.matrix_world
-                ob = evalObj.rotation_euler.to_matrix()
+        print(objInfo)
+        for f in range(splits):
+            for frame in range(self.frameCount):
+                bpy.data.scenes['Scene'].frame_set(frame + bpy.context.scene.frame_start)
+
+                lengthTracker = sLength
                 
-                v = evalObj.data.vertices
-                #section = len(v)/splits 
+                for o, oInfo in enumerate(objInfo):
+                    #get eval obj
+                    dg = bpy.context.view_layer.depsgraph
+                    evalObj = objs[oInfo[0]].evaluated_get(dg)
 
-                #s = round(section * f)
-                #e = round(section * f + section)
-                
-                for vert in v:
-                    index = vert.index
-                    if bpy.context.scene.vat.worldPos == True:
-                        pos = self.unsign_vector((mb @ evalObj.data.vertices[index].co.copy())/ratio)
-                    else:
-                        pos = self.unsign_vector(evalObj.data.vertices[index].co.copy()/ratio)
-                    pos.append(1.0)
-                    posData += pos
+                    mb = evalObj.matrix_world
+                    ob = evalObj.rotation_euler.to_matrix()
                     
-                    if bpy.context.scene.vat.worldPos == True:
-                        #norm = self.unsign_vector(ob @ vert.normal.copy())
-                        #norm = self.unsign_vector(evalObj.matrix_world @ vert.normal.copy())
-                        norm = self.unsign_vector(evalObj.matrix_world.inverted_safe().transposed().to_3x3() @ vert.normal.copy())
-                    else:
-                        norm = self.unsign_vector(vert.normal.copy())
-                    norm.append(1.0)
-                    normData += norm
+                    v = evalObj.data.vertices
+                    vLen = len(v)
 
-        bpy.context.scene.vat.progress = .4
-        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
+                    if objInfo[o][1] < vLen:
+                        v = v[int(vLen-objInfo[o][1]):]
+
+                    if objInfo[o][1] > lengthTracker:
+                        v = v[:int(lengthTracker)]
+                        lengthTracker = 0
+                    else:
+                        lengthTracker -= objInfo[o][1]
+
+                    for vert in v:
+                        index = vert.index
+                        if bpy.context.scene.vat.worldPos == True:
+                            pos = self.unsign_vector((mb @ evalObj.data.vertices[index].co.copy())/ratio)
+                        else:
+                            pos = self.unsign_vector(evalObj.data.vertices[index].co.copy()/ratio)
+                        pos.append(1.0)
+                        posData += pos
+                        
+                        if bpy.context.scene.vat.worldPos == True:
+                            #norm = self.unsign_vector(ob @ vert.normal.copy())
+                            #norm = self.unsign_vector(evalObj.matrix_world @ vert.normal.copy())
+                            norm = self.unsign_vector(evalObj.matrix_world.inverted_safe().transposed().to_3x3() @ vert.normal.copy())
+                        else:
+                            norm = self.unsign_vector(vert.normal.copy())
+                        norm.append(1.0)
+                        normData += norm
+                    
+                    if lengthTracker <= 0: break
+
+            finVerts = sLength
+            while finVerts != 0:
+                finVerts = objInfo[0][1] - finVerts
+                if finVerts > 0:
+                    objInfo[0][1] = finVerts
+                    finVerts = 0
+                elif finVerts < 0:
+                    finVerts = abs(finVerts)
+                    objInfo.pop(0)
+                elif finVerts == 0:
+                    objInfo.pop(0)
+            print(objInfo)
+
+            bpy.context.scene.vat.progress += .4/splits
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
+
         return [posData, normData]
 
     def get_obj_vertex_data(self, splits, fObjs, ratio):
