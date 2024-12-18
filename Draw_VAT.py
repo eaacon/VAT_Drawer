@@ -7,6 +7,8 @@ import time
 class VAT_Draw_Properties(bpy.types.PropertyGroup):
     exportObj: bpy.props.PointerProperty(type = bpy.types.Object, name = "")
 
+    texOnly: bpy.props.BoolProperty(name = "Textures Only", default = False, 
+    description = "Export only the textures?")
     hasExtras: bpy.props.BoolProperty(name = "Include Extras?", default = False, 
     description = "Would you like to include extra objects in export?")
     exportExtras: bpy.props.PointerProperty(type = bpy.types.Collection, name = "Extra Meshes", 
@@ -23,7 +25,13 @@ class VAT_Draw_Properties(bpy.types.PropertyGroup):
     default = True,
     description="Attempts to cut in half and stack the output image to become as square as possible")
 
-    popup: bpy.props.BoolProperty(name = "Popup?", default = True)
+    popup: bpy.props.EnumProperty(
+        items = [('no', "None", "No Popup", "X", 0),
+        ('pos', "Position", "Show Position VAT", "OBJECT_ORIGIN", 1),
+        ('norm', "Normals", "Show Normals VAT", "ORIENTATION_NORMAL", 2)],
+        default = 1,
+        description = "Option for showing finished VAT texture popup."
+    )
 
     outputDir: bpy.props.StringProperty(
         name="",
@@ -74,7 +82,7 @@ class VAT_OT_draw(bpy.types.Operator):
     
     def execute_normal(self, context):
         context.scene.vat.progress = 0
-        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
+        bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations = 3)
         #get objects for VAT
         vatObjs = context.selected_objects
 
@@ -123,24 +131,31 @@ class VAT_OT_draw(bpy.types.Operator):
             print(self.cuts)
             vData = self.get_anim_vertex_data(self.cuts, vatObjs, scale)
 
-            self.draw_vat_image(vData[0], "_position" + meta, [int(self.vertices / self.cuts), int(self.frameCount * self.cuts)])
-            pImg = self.draw_vat_image(vData[1], "_normals"+ meta, [int(self.vertices / self.cuts), int(self.frameCount * self.cuts)])
+            p = self.draw_vat_image(vData[0], "_position" + meta, [int(self.vertices / self.cuts), int(self.frameCount * self.cuts)])
+            context.scene.vat.progress = .7
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
+            n = self.draw_vat_image(vData[1], "_normals"+ meta, [int(self.vertices / self.cuts), int(self.frameCount * self.cuts)])
+            context.scene.vat.progress = .85
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
         else:
             vData = self.get_anim_vertex_data(1, vatObjs, scale)
 
-            pImg = self.draw_vat_image(vData[0], "_position"+ meta, [self.vertices, self.frameCount])
+            p = self.draw_vat_image(vData[0], "_position"+ meta, [self.vertices, self.frameCount])
             context.scene.vat.progress = .7
             bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
-            self.draw_vat_image(vData[1], "_normals"+ meta, [self.vertices, self.frameCount])
+            n = self.draw_vat_image(vData[1], "_normals"+ meta, [self.vertices, self.frameCount])
             context.scene.vat.progress = .85
             bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
         
-        if pImg != None:
-            self.show_image(pImg)
+        if bpy.context.scene.vat.popup == "pos" and p != None:
+            self.show_image(p)
+        elif bpy.context.scene.vat.popup == "norm" and n != None:
+            self.show_image(n)
         
         #export VAT mesh
         self.uvProgress = 0
-        self.export_mesh(vatObjs)
+        if bpy.context.scene.vat.texOnly == False: self.export_mesh(vatObjs)
+
         context.scene.vat.progress = 1
         bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
         
@@ -202,6 +217,7 @@ class VAT_OT_draw(bpy.types.Operator):
         return image
     
     def export_mesh(self, objs, f = 0):
+        #stack uvs based on splits
         bpy.context.scene.frame_set(f)
 
         active = bpy.context.active_object
@@ -367,7 +383,7 @@ class VAT_OT_draw(bpy.types.Operator):
             print(objInfo)
 
             bpy.context.scene.vat.progress += .4/splits
-            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP')
+            bpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations = 3)
 
         return [posData, normData]
 

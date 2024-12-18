@@ -39,10 +39,7 @@ class VIEW3D_PT_Frame_Generator(bpy.types.Panel):
 
         outputCount.label(text = "Count: " + str(fCalc) + " frames")
 
-        self.layout.row().separator()
-        
-        row = self.layout.row()
-        row.prop(context.scene.frame_gen, "meshFrames", toggle = True)
+        outputCount.prop(context.scene.frame_gen, "meshFrames", toggle = True, icon = "MESH_MONKEY", icon_only = True)
 
         if context.scene.frame_gen.meshFrames == False:
             return
@@ -85,6 +82,7 @@ class VIEW3D_PT_VAT_Drawer(bpy.types.Panel):
             self.layout.row().separator()
 
         row = self.layout.row()
+        row.prop(context.scene.vat, "texOnly", toggle = True, icon = "NODE_TEXTURE", icon_only = True)
         row.prop(context.scene.vat, "worldPos", toggle = True, icon = "WORLD", text = "World")
         row.prop(context.scene.vat, "genBaseUV", toggle = True, icon = "UV", text = "UV")
         row.prop(context.scene.vat, "ratio")
@@ -94,14 +92,17 @@ class VIEW3D_PT_VAT_Drawer(bpy.types.Panel):
         row = box.row()
         row.prop(context.scene.vat, "outputDir")
         row.prop(context.scene.vat, "isFolded", toggle = True, icon = "MOD_EDGESPLIT", icon_only = True)
-        row.prop(context.scene.vat, "hasExtras", toggle = True, icon = "DECORATE_LINKED", icon_only = True)
+        if context.scene.vat.texOnly == False:
+            row.prop(context.scene.vat, "hasExtras", toggle = True, icon = "DECORATE_LINKED", icon_only = True)
 
-        if context.scene.vat.hasExtras == True:
+        if context.scene.vat.hasExtras == True and context.scene.vat.texOnly == False:
             row = box.row()
             row.prop(context.scene.vat, "exportExtras", icon_only = True)
         
-        row = box.row()
-        row.prop(context.scene.vat, "exportType", expand=True)
+        if context.scene.vat.texOnly == False:
+            row = box.row()
+            row.scale_y = 1.5
+            row.prop(context.scene.vat, "exportType", expand=True)
 
         draw = self.layout.row()
         draw.scale_y = 2
@@ -114,7 +115,7 @@ class VIEW3D_PT_VAT_Drawer(bpy.types.Panel):
         
         create.progress(text = str(spd) + "s", factor = context.scene.vat.progress)
 
-        create.prop(context.scene.vat, "popup", toggle = True, icon = "WINDOW", icon_only = True)
+        create.prop(context.scene.vat, "popup", toggle = True, icon_only = True)
         if context.scene.frame_gen.meshFrames == False:
             create.prop(context.scene.vat, "deleteExportMesh", toggle = True, icon = "TRASH", icon_only = True)
         
