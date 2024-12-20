@@ -116,7 +116,7 @@ class VIEW3D_PT_VAT_Drawer(bpy.types.Panel):
         create.progress(text = str(spd) + "s", factor = context.scene.vat.progress)
 
         create.prop(context.scene.vat, "popup", toggle = True, icon_only = True)
-        if context.scene.frame_gen.meshFrames == False:
+        if context.scene.frame_gen.meshFrames == False and context.scene.vat.texOnly == False:
             create.prop(context.scene.vat, "deleteExportMesh", toggle = True, icon = "TRASH", icon_only = True)
         
         pass
