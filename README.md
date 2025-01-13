@@ -14,4 +14,4 @@
 
   VFX created using this tool here: https://youtu.be/j-KO_elnDqA?si=AK40dsyPBOUhSSNr
 
-  Once tool is more stable will update README to make more sense.
+  Once tool is more stable will update README to make more sense, I wrote this at 3am.
